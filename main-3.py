@@ -1,447 +1,200 @@
-import os
 import tkinter as tk
-from six.moves import cPickle as pickle
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import datetime
+from tkinter import messagebox
+import os
+import random
+from collections import Counter
 import time
-import webbrowser
-
-matplotlib.use('TkAgg')
-
-PROGRESS_FILE = "progress.p"
-LETTERS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-           'q', 'w', 'e', 'r', 't', 'z', 'u', 'i', 'o', 'p',
-           'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l',
-           'y', 'x', 'c', 'v', 'b', 'n', 'm',
-           'Q', 'W', 'E', 'R', 'T', 'Z', 'U', 'I', 'O', 'P',
-           'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
-           'Y', 'X', 'C', 'V', 'B', 'N', 'M']
-SPECIAL_KEYS = {'degree': '°', 'asciicircum': '^', 'exclam': '!', 'quotedbl': '"',
-                'section': '§', 'dollar': '$', 'percent': '%', 'ampersand': "&", 'slash': "/",
-                'parenleft': '(', 'parenright': ')', 'equal': '=', 'question': '?',
-                'grave': '`', 'space': " ", 'ssharp': "ß", 'acute': '´', 'plus': '+',
-                'less': '<', 'comma': ',', 'period': '.', 'minus': '-', 'underscore': '_',
-                'udiaeresis': 'ü', 'Udiaeresis': 'Ü', 'odiaeresis': 'ö', 'Odiaeresis': 'Ö',
-                'adiaeresis': 'ä', 'Adiaeresis': 'Ä', 'asterisk': '*', 'numbersign': '#',
-                'apostrophe': "'", 'colon': ':', 'semicolon': ';', 'greater': '>', 'at': '@',
-                'twosuperior': '²', 'threesuperior': '³', 'asciitilde': '~', 'mu': 'µ', 'bar': '|',
-                'EuroSign': '€', 'backslash': '\\', 'braceleft': '{', 'bracketleft': '[',
-                'braceright': '}', 'bracketright': ']',
-                'aacute': 'á', 'agrave': 'à', 'eacute': 'é', 'egrave': 'è', 'iacute': 'í', 'igrave': 'ì',
-                'oacute': 'ó', 'ograve': 'ò', 'uacute': 'ú', 'ugrave': 'ù',
-                'Aacute': 'Á', 'Agrave': 'À', 'Eacute': 'É', 'Egrave': 'È', 'Iacute': 'Í', 'Igrave': 'Ì',
-                'Oacute': 'Ó', 'Ograve': 'Ò', 'Uacute': 'Ú', 'Ugrave': 'Ù'}
 
 
-class MyFrame(tk.Frame):
-    def __init__(self, top_window, location):
-        super().__init__(top_window)
-        self.pack(side=location, expand=True, fill=tk.BOTH)
-
-
-class MyButton(tk.Button):
-    def __init__(self, frame, location, txt, command):
-        super().__init__(frame, text=txt, font=('TkTextFont', 12), command=command)
-        self.pack(side=location, padx=8, pady=5)
-
-
-class WordLimit():
-    # Create max words list
-    def __init__(self, parent, default=300):
-        w = tk.Label(parent, text="Max. words: ", font=('TkTextFont', 12))
-        parent.columnconfigure(0, weight=0)
-        w.grid(row=0, column=0, padx=10)
-        self.var = tk.IntVar()
-        self.value = tk.Spinbox(parent, values=(100, 200, 300, 400, 500), textvariable=self.var,
-                                bg="white", width=5, justify=tk.CENTER, state='readonly', font=('TkTextFont', 11))
-        parent.columnconfigure(1, weight=0)
-        self.value.grid(row=0, column=1, sticky=tk.W)
-        self.var.set(default)  # default value
-
-
-class WordCounter():
-    def __init__(self, frame):
-        # Create number of words label
-        self.counter = tk.StringVar()
-        self.counter.set(0)
-        lword_count_txt = tk.Label(frame, text="# of words: ", font=('TkTextFont', 12))
-        lword_count = tk.Label(frame, textvariable=self.counter, font=('TkTextFont', 12), anchor="w")
-        lword_count_txt.grid(row=0, column=4)
-        lword_count.grid(row=0, column=5, padx=10)
-
-
-class WikiLang():
-    # Create max words list
-    def __init__(self, parent, default="English"):
-        w = tk.Label(parent, text="Language: ", font=('TkTextFont', 12))
-        parent.columnconfigure(2, weight=1)
-        w.grid(row=0, column=2, sticky=tk.E)
-        self.var = tk.StringVar()
-        self.value = tk.Spinbox(parent, values=("English", "Español", "Deutsch"), textvariable=self.var,
-                                background="cyan", width=10, justify=tk.CENTER, state='readonly',
-                                font=('TkTextFont', 12))
-        # print(self.value.cget('font'))
-        parent.columnconfigure(3, weight=1)
-        self.value.grid(row=0, column=3, sticky=tk.W)
-        self.var.set(default)  # default value
-
-
-class MyMainWindow(tk.Tk):
+class JobLoader:
     def __init__(self):
-        super().__init__()
-        self.title("Typing Trainer")
-        self.minsize(600, 300)
-        self.protocol("WM_DELETE_WINDOW", self.quit)
-        # Create frames in window
-        bottom_frame = MyFrame(self, tk.BOTTOM)
-        top_frame = MyFrame(self, tk.TOP)
-        center_frame = MyFrame(self, tk.TOP)
-        # Set max words and word counter
-        self.max_words = WordLimit(top_frame)
-        words = WordCounter(top_frame)
-        # Select language
-        self.lang = WikiLang(top_frame)
-        # Define text box with scrollbar
-        txt_box = TrainText(center_frame, self.max_words.value, words.counter, self.lang.value)
-        # Create buttons
-        MyButton(bottom_frame, tk.RIGHT, 'Quit', self.quit)
-        MyButton(bottom_frame, tk.LEFT, 'Progress', lambda: ProgressPlotsWindow(self))
-        MyButton(bottom_frame, tk.LEFT, 'Reload Text', txt_box.reload_text)
+        self.txt_files = [f for f in os.listdir('.') if os.path.isfile(f) and f.endswith('.txt')]
+
+    def load_random_file(self):
+        file_name = random.choice(self.txt_files)
+        with open(file_name, 'r') as file:
+            return list(file.read())
 
 
-class ProgressPlotsWindow(tk.Toplevel):
-    def __init__(self, top):
-        super().__init__(master=top)
-        self.title("Progress")
-        self.top_frame = MyFrame(self, tk.TOP)
-        self.bottom_frame = MyFrame(self, tk.BOTTOM)
-        self.fig = plt.figure(figsize=(6, 4), dpi=100)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.bottom_frame)
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.max_words = WordLimit(self.top_frame, top.max_words.value.get())
-        self.max_words.value.bind('<ButtonRelease-1>', lambda event: self.on_release(event))
-        self.plot_data = load_data()  # wpm, acc, score, date
-        self.plots = {0: 'Words per minute', 1: 'Accuracy', 2: 'Score'}
-        self.ylims = {0: (0, 50), 1: (90, 100), 2: (0, 10)}
-        self.current_plot = 0
+class Statistics:
+    def __init__(self):
+        self.total_chars = 0
+        self.errors = 0
+        self.start_time = time.time()  # Add start time
+        self.error_counter = Counter()
+        self.is_stopped = False  # Add a flag to check if the program is stopped
+        self.start_time = None
 
-        self.b_wpm = tk.Button(self.top_frame, text=self.plots[0], font=('TkTextFont', 12),
-                               command=lambda: self.plot(0, self.get_set()))
-        self.top_frame.columnconfigure(1, weight=1)
-        self.b_wpm.grid(row=0, column=2, padx=5)
-        self.b_acc = tk.Button(self.top_frame, text=self.plots[1], font=('TkTextFont', 12),
-                               command=lambda: self.plot(1, self.get_set()))
-        self.b_acc.grid(row=0, column=3, padx=5)
-        self.b_score = tk.Button(self.top_frame, text=self.plots[2], font=('TkTextFont', 12),
-                                 command=lambda: self.plot(2, self.get_set()))
-        self.b_score.grid(row=0, column=4, sticky=tk.E, padx=5)
-
-        self.plot(self.current_plot, self.get_set())
-
-    def on_release(self, e):
-        nset = self.get_set() + (2 * (e.y < 10) - 1) * 100
-        cset = sorted((100, nset, 500))[1]
-        self.plot(self.current_plot, cset)
-
-    def get_set(self):
-        return self.max_words.var.get()
-
-    def plot(self, plot_nr, plot_set):
-        self.current_plot = plot_nr
-        xdata = self.plot_data[3][plot_set]
-        ydata = self.plot_data[plot_nr][plot_set]
-        dates = [datetime.datetime.strptime(d, '%Y-%m-%d %H:%M') for d in xdata]
-        dates_f = [d.strftime('%d %b %y, %H:%M') for d in dates]
-        plt.cla()
-        plt.title(self.plots[plot_nr])
-        plt.scatter(dates_f, ydata)
-        plt.plot(dates_f, ydata)
-        plt.gcf().subplots_adjust(bottom=0.25, left=0.2)
-        plt.setp(plt.gca().get_xticklabels(), rotation=30, horizontalalignment='right')
-        plt.ylim(self.ylims[plot_nr])
-        ticks = [x for x in range(0, len(dates_f), int(len(dates_f) / 10) + 1)]
-        if len(dates_f) > 0:
-            if ticks[-1] != (len(dates_f) - 1): ticks[-1] = (len(dates_f) - 1)
-        plt.xticks(ticks)
-        plt.grid(True, 'major', 'y', ls='--')
-        plt.grid(True, 'major', 'x', ls=':', lw=0.3)
-        self.canvas.draw()
-
-
-class TrainText(tk.Text):
-    def __init__(self, frame, max_words, word_counter, language):
-        # Define and place objects
-        vbar = tk.Scrollbar(frame, orient=tk.VERTICAL)
-        vbar.pack(side=tk.RIGHT, fill=tk.Y)
-        super().__init__(frame, wrap=tk.WORD, bg="black", height=20, width=70,
-                         font=('monospace', 14), yscrollcommand=vbar.set,
-                         spacing1=2, padx=5, pady=10, borderwidth=4)
-        vbar.config(command=self.yview)
-        self.pack(expand=True, fill="both")
-        # Define tags and marks
-        self.tag_config("good", background="white smoke", foreground="green")
-        self.tag_config("bad", background="misty rose", foreground="red")
-        self.tag_config("corrected", background="gainsboro", foreground="gold4")
-        self.tag_config("cursor", background="yellow", foreground="black")
-        self.tag_config("hyper", foreground="blue", underline=True)
-        self.bad = set()
-        self.corrected = set()
-        # Define bindings
-        self.bind_all('<Key>', self.type)
-        self.tag_bind("hyper", "<Enter>", self._enter)
-        self.tag_bind("hyper", "<Leave>", self._leave)
-        self.tag_bind("hyper", "<Button-1>", self._click)
-        # Define screen variables
-        self.screens = ['Welcome', 'Loading', 'Training', 'Summary']
-        self.screen_ix = 0
-        self.start_time = 0
-        self.finish_time = 0
-        # Define text variables
-        self.text = ''
-        self.link = ''
-        self.lang_codes = {'English': 'en', "Русский": 'ru'}
-        self.lang = language
-        self.characters = 0
-        self.word_counter = word_counter
-        self.mistakes = 0
-        self.max_words = max_words
-        # Start show :)
-        self.show()
-
-    def get_text_from_file(self):
-        random_txt_file = 'article.txt'
-        # read the contents of the .txt file
-        with open(os.path.join(random_txt_file), "r") as f:
-            text = f.read()
-        # return the text
-        return text
-
-    def show(self):
-        self.config(state=tk.NORMAL)
-        self.delete("0.0", tk.END)
-        screen = self.screens[self.screen_ix]
-        if screen == "Welcome":
-            self.insert(tk.END, "Welcome!\n\nPress any key to load the next text.\n")
-        elif screen == "Loading":
-            self.characters = 0
-            self.word_counter.set(0)
-            self.mistakes = 0
-            self.insert(tk.END, "Loading page...")
-            self.update()
-            self.text = self.get_text_from_file()
-            self.characters = len(self.text)
-            self.word_counter.set(len(self.text.split()))
-            self.insert(tk.END, "\n\nPress any key to start the exercise.\n\n")
-            # self.insert(tk.END, self.link.split('/')[-1], "hyper")
-        elif screen == "Training":
-            self.insert(tk.END, self.text)
-            self.insert(tk.END, '\u00B6\n')
-            self.mark_set("cursor_mark", "0.0")
-            self.mark_set("good_mark", "0.0")
-            self.tag_add("cursor", "cursor_mark")
-            self.bad = set()
-            self.corrected = set()
+    def start(self):
+        if self.start_time is None:
             self.start_time = time.time()
-        elif screen == "Summary":
-            self.finish_time = time.time() - self.start_time
-            minutes = int(self.finish_time / 60)
-            sec = self.finish_time % 60
-            cps = self.characters / self.finish_time
-            # wpm = 60 * int(self.word_counter.get()) / self.finish_time
-            wpm = cps * 60 / 5
-            acc = 100 * (1 - self.mistakes / self.characters)
-            score = (wpm / 10) + (acc - 97.5) * 2
-            summary = ["Congratulations!\n"]
-            summary.append("You did it in %i minutes and %i seconds\n" % (minutes, sec))
-            summary.append("Characters per second: %.1f\n" % cps)
-            summary.append("Words per minute: %.1f\n" % wpm)
-            summary.append("Accuracy: %.1f%%\n" % acc)
-            summary.append("Score: %.2f\n" % score)
-            summary.append("\nPress any key to continue training.\n\n")
-            self.save_progress(wpm, acc, score)
-            for line in summary:
-                self.insert(tk.END, line)
-            self.insert(tk.END, self.link.split('/')[-1], "hyper")
-        self.config(state=tk.DISABLED)
 
-    def _enter(self, event):
-        self.config(cursor="hand2")
+    def stop(self):
+        self.is_stopped = True
+        self.stop_time = time.time()  # Remember the time when stopped
 
-    def _leave(self, event):
-        self.config(cursor="")
-
-    def _click(self, event):
-        webbrowser.open_new(self.link)
-
-    def change_status(self):
-        if self.screen_ix < 3:
-            self.screen_ix += 1
-        elif self.screen_ix == 3:
-            self.screen_ix = 1
-        self.show()
-
-    def reload_text(self):
-        """Load new text."""
-        self.screen_ix = 1
-        self.show()
-        self.text = self.get_text_from_file()
-        self.screen_ix += 1
-        self.show()
-
-    @staticmethod
-    def get_type_char(event):
-        key = event.keysym
-        # print(key)
-        if key in LETTERS: return key
-        if key in SPECIAL_KEYS: return SPECIAL_KEYS[key]
-        if key == 'BackSpace': return -1
-        if key == 'Return': return "newline"
-        return
-
-    def type(self, event):
-        if self.screen_ix == 2:
-            key = self.get_type_char(event)
-            cursor_char = self.get(self.tag_ranges('cursor')[0], self.tag_ranges('cursor')[1])
-            if key:
-                move_good = (key == cursor_char or (key == "newline" and cursor_char == '\u00B6') or key == -1)
-                if move_good and key != -1 and self.index('cursor_mark') in self.bad:
-                    self.bad.remove(self.index('cursor_mark'))
-                    self.corrected.add(self.index('cursor_mark'))
-                if not move_good or self.compare('cursor_mark', '!=', 'good_mark') and key != -1:
-                    self.mistakes += 1
-                    self.bad.add(self.index('cursor_mark'))
-                self.remove_tags()
-                self.update_marks(forward=(key != -1), move_good=move_good)
-                self.add_tags()
-            if self.check_finish():
-                self.change_status()
-            self.check_and_scroll()
-        else:
-            self.change_status()
-
-    def check_and_scroll(self):
-        cursor_y = self.dlineinfo('cursor_mark')[1]
-        window_height = self.winfo_height()
-        if cursor_y + 80 > window_height:
-            self.yview_scroll(window_height / 2, 'pixels')
-
-    def update_marks(self, forward=True, move_good=True):
-        if move_good and self.compare('cursor_mark', '==', 'good_mark'):
-            self.move_mark('good_mark', forward)
-        self.move_mark('cursor_mark', forward)
-
-    def move_mark(self, mark_name, forward):
-        line, column = tuple(map(int, str.split(self.index(mark_name), ".")))
-        if forward:
-            step = 1
-            if self.index("%d.end" % (line)) == ("%d.%d" % (line, column + 1)):  # EOL
-                line += 1
-                column = -step
-        else:
-            step = -1
-            if column == 0 and line > 1:  # First line character
-                line, column = tuple(map(int, str.split(self.index("%d.end" % (line - 1)), ".")))
-        self.mark_set(mark_name, "%d.%d" % (line, column + step))
-
-    def remove_tags(self):
-        self.tag_remove("good", "0.0", "good_mark")
-        self.tag_remove("cursor", "cursor_mark")
-        for m in self.bad:
-            self.tag_remove('bad', m)
-        for c in self.corrected:
-            self.tag_remove('corrected', c)
-
-    def add_tags(self):
-        self.tag_add("good", "0.0", 'good_mark')
-        self.tag_add("cursor", "cursor_mark")
-        for m in self.bad:
-            self.tag_add('bad', m)
-        for c in self.corrected:
-            self.tag_add('corrected', c)
-
-    def check_finish(self):
-        line, column = tuple(map(int, str.split(self.index('good_mark'), ".")))
-        end_line, end_column = tuple(map(int, str.split(self.index(tk.END), ".")))
-        if line + 1 == end_line and column == end_column:
-            return True
-        else:
-            return False
-
-    def save_progress(self, wpm, acc, score):
-        wpm_series, acc_series, score_series, date_series = load_data()
-        max_length = int(self.max_words.get())
-        date = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
-        wpm_series[max_length].append(wpm)
-        acc_series[max_length].append(acc)
-        score_series[max_length].append(score)
-        date_series[max_length].append(date)
-        pickle.dump([wpm_series, acc_series, score_series, date_series], open(PROGRESS_FILE, 'wb'))
+    def continue_(self):
+        if self.is_stopped:
+            self.is_stopped = False
+            self.start_time += time.time() - self.stop_time  # Adjust the start time
 
 
-def load_data():
-    try:
-        wpm_series, acc_series, score_series, date_series = \
-            pickle.load(open(PROGRESS_FILE, 'rb'), encoding='latin1')
-    except (OSError, IOError):  # No progress file yet available
-        empty = {100: [], 200: [], 300: [], 400: [], 500: []}
-        wpm_series = {100: [], 200: [], 300: [], 400: [], 500: []}
-        acc_series = {100: [], 200: [], 300: [], 400: [], 500: []}
-        score_series = {100: [], 200: [], 300: [], 400: [], 500: []}
-        date_series = {100: [], 200: [], 300: [], 400: [], 500: []}
-    return wpm_series, acc_series, score_series, date_series
+    def update(self, char, error):
+        self.total_chars += 1
+        if error:
+            self.errors += 1
+            self.error_counter[char] += 1
+
+    def most_common_error(self):
+        return self.error_counter.most_common(1)[0] if self.error_counter else None
+
+    def keystrokes_per_second(self):
+        elapsed_time = time.time() - self.start_time
+        return self.total_chars / elapsed_time if elapsed_time > 0 else 0
 
 
-def format(txt):
-    print(txt)
-    f_sent_l_word = txt.split('.')[0].split()[-1]
-    # print(f_sent_l_word)
-    # Remove brakets in first sentence, that often includes non keyboard characters
-    forms = ['Sr', 'Jr']
-    if f_sent_l_word in forms or len(f_sent_l_word) == 1:
-        i = 1
-    else:
-        i = 0
-    check_brackets = txt.split('.')[i]
-    if '(' in check_brackets and ')' in check_brackets:
-        a = check_brackets.index('(')
-        b = check_brackets.index(')')
-        in_brackets = check_brackets[a - 1:b + 1]
-        no_brackets = check_brackets.replace(in_brackets, '')
-        txt = txt.replace(check_brackets, no_brackets)
-    # Now remove text between [] in all text
-    c = True
-    while c:
-        if '[' in txt and ']' in txt:
-            a = txt.index('[')
-            b = txt.index(']')
-            in_brackets = txt[a - 1:b + 1]
-            txt = txt.replace(in_brackets, '')
-        else:
-            c = False
+class TypingTrainer:
+    def __init__(self, char_list, statistics):
+        self.char_list = char_list
+        self.statistics = statistics
+        self.counter = 0
 
-    ntext = txt
-    h = 0
-    for i in range(len(txt)):
-        if txt[i] == "\n":
-            print("Enter")
-            ntext = ntext[:i + h] + "\u00B6" + ntext[i + h:]
-            h += 1
-        if txt[i] == "–" or txt[i] == "—":
-            ntext = ntext[:i + h] + "-" + ntext[i + h + 1:]
-        if txt[i] == 'ñ':
-            ntext = ntext[:i + h] + "n" + ntext[i + h + 1:]
-        if txt[i] == '\u200b':
-            print("ub")
-            ntext = ntext[:i + h] + " " + ntext[i + h + 1:]
-            h += 0
-    return ntext
+    def check_char(self, char):
+        correct = char == self.char_list[self.counter]
+        self.statistics.update(char, not correct)
+        if correct:
+            self.counter += 1
+        return correct
 
 
-main = MyMainWindow()
-main.mainloop()
+class App:
+    def __init__(self):
+        self.job_loader = JobLoader()
+        self.char_list = self.job_loader.load_random_file()
+        self.statistics = Statistics()
+        self.typing_trainer = TypingTrainer(self.char_list, self.statistics)
 
-# from tkinter import font
-# for f in set(font.families()):
-#     print(f)
+        self.root = tk.Tk()
+
+        # Display the original text
+        self.text_widget = tk.Text(self.root, height=30, width=100)
+        self.text_widget.insert('1.0', ''.join(self.char_list))
+        self.text_widget.pack()
+
+        self.entry = tk.Entry(self.root)
+        self.entry.pack()
+        self.entry.focus_set()
+
+        self.reload_button = tk.Button(self.root, text="Reload", command=self.reload)
+        self.reload_button.pack(side='left')
+
+        self.exit_button = tk.Button(self.root, text="Exit", command=self.root.quit)
+        self.exit_button.pack(side='right')
+
+        # Add a "statistics" button
+        self.stats_button = tk.Button(self.root, text="Statistics", command=self.show_statistics)
+        self.stats_button.pack(side='right')
+
+        # Add "Stop" and "Continue" buttons
+        self.stop_button = tk.Button(self.root, text="Stop", command=self.stop)
+        self.stop_button.pack(side='right')
+        self.continue_button = tk.Button(self.root, text="Continue", command=self.continue_)
+        self.continue_button.pack(side='right')
+
+        self.root.bind('<Key>', self.key_pressed)
+
+        self.entered_text_window = tk.Toplevel(self.root)
+        self.entered_text_widget = tk.Text(self.entered_text_window, height=10, width=50)
+        self.entered_text_widget.pack()
+        self.text_widget.config(state='disabled')  # Make the text widget unchangeable
+
+        # Add a "complete" button
+        self.complete_button = tk.Button(self.root, text="Complete", command=self.complete)
+        self.complete_button.pack(side='right')
+
+        # Add a "Start" button
+        self.start_button = tk.Button(self.root, text="Start", command=self.start)
+        self.start_button.pack(side='left')
+# Add a timer
+        self.timer_label = tk.Label(self.root)
+        self.timer_label.pack(side='right')
+
+    def start(self):
+        self.statistics.start()
+        self.update_timer()
+
+    def update_timer(self):
+        elapsed_time = time.time() - self.statistics.start_time
+        minutes, seconds = divmod(int(elapsed_time), 60)
+        self.timer_label.config(text=f'{minutes}:{seconds:02}')
+        if not self.statistics.is_stopped:
+            self.root.after(1000, self.update_timer)  # Update the timer every second
+
+
+    def key_pressed(self, event):
+        if self.statistics.is_stopped:  # Don't register key presses when stopped
+            return
+        if event.keysym not in ['Shift_L', 'Shift_R', 'BackSpace']:  # Ignore Shift and Backspace keys
+            correct = self.typing_trainer.check_char(event.char)
+            if correct:
+                print(event.char, end='', flush=True)
+                self.entered_text_widget.insert('end', event.char)  # Add entered char to the new window
+                self.text_widget.delete('1.0', '1.1')  # Remove the correct char from the original text
+                self.text_widget.delete('1.0', tk.END)  # Delete the old text
+                self.text_widget.insert('1.0', ''.join(self.char_list[self.statistics.total_chars:]))
+
+    def stop(self):
+        self.statistics.stop()
+
+    def continue_(self):
+        self.statistics.continue_()
+
+
+
+
+    def reload(self):
+        self.char_list = self.job_loader.load_random_file()
+        self.statistics = Statistics()
+        self.typing_trainer = TypingTrainer(self.char_list, self.statistics)
+        self.entry.delete(0, 'end')
+        # Update the original text
+        self.text_widget.config(state='normal')  # Make the text widget changeable
+        self.text_widget.delete('1.0', 'end')
+        self.text_widget.insert('1.0', ''.join(self.char_list))
+        self.text_widget.config(state='disabled')  # Make the text widget unchangeable again
+        # Clear the entered text window
+        self.entered_text_widget.delete('1.0', 'end')
+
+
+    def show_statistics(self):
+        messagebox.showinfo("Statistics",
+                            f"Total characters: {self.statistics.total_chars}\n"
+                            f"Errors: {self.statistics.errors}\n"
+                            f"Most common error: {self.statistics.most_common_error()}\n"
+                            f"Keystrokes per second: {self.statistics.keystrokes_per_second():.2f}")
+        # Add keystrokes per second
+
+    def run(self):
+        self.root.mainloop()
+
+    def complete(self):
+        # Generate statistics
+        stats = {
+            "Total Chars": self.statistics.total_chars,
+            "Errors": self.statistics.errors,
+            "Most Common Error": self.statistics.most_common_error(),
+            "Keystrokes per Second": self.statistics.keystrokes_per_second()
+        }
+
+        # Write statistics to a text file
+        with open('statistics.txt', 'w') as file:
+            for key, value in stats.items():
+                file.write(f"{key}: {value}\n")
+
+        # Show a message box indicating that the attempt has been completed
+        messagebox.showinfo("Complete", "Your attempt has been completed and the statistics have been saved.")
+
+
+if __name__ == "__main__":
+    app = App()
+    app.run()
