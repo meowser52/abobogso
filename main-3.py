@@ -38,7 +38,6 @@ class Statistics:
             self.is_stopped = False
             self.start_time += time.time() - self.stop_time  # Adjust the start time
 
-
     def update(self, char, error):
         self.total_chars += 1
         if error:
@@ -130,6 +129,14 @@ class App:
         if not self.statistics.is_stopped:
             self.root.after(1000, self.update_timer)  # Update the timer every second
 
+    def update_text(self, event):
+        """Update text on the screen when a key is pressed."""
+        # other code...
+
+        # check if all text has been entered correctly
+        if self.text == self.user_text.get():
+            self.complete()
+            self.quit()
 
     def key_pressed(self, event):
         if self.statistics.is_stopped:  # Don't register key presses when stopped
