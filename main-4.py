@@ -26,6 +26,12 @@ class Statistics:
         self.is_stopped = False  # Add a flag to check if the program is stopped
         self.start_time = None
 
+    def reset(self):
+        self.total_chars = 0
+        self.errors = 0
+        self.start_time = time.time()
+        self.error_counter = Counter()
+
     def start(self):
         if self.start_time is None:
             self.start_time = time.time()
@@ -63,7 +69,7 @@ class Application(tk.Frame):
         self.create_widgets()
 
     def start_typing(self):
-        root.destroy()
+        self.master.destroy()
         #        self.start_button.destroy()
         #        self.start_label.destroy()
         app = App()
@@ -153,7 +159,7 @@ class App:
     def key_pressed(self, event):
         if self.statistics.is_stopped:  # Don't register key presses when stopped
             return
-        if event.keysym not in ['Shift_L', 'Shift_R', 'BackSpace']:  # Ignore Shift and Backspace keys
+        if event.keysym not in ['Shift_L', 'Shift_R', 'BackSpace', 'Alt']:  # Ignore some keys
             correct = self.typing_trainer.check_char(event.char)
             if correct:
                 print(event.char, end='', flush=True)
@@ -170,13 +176,14 @@ class App:
 
     def reload(self):
         self.char_list = self.job_loader.load_random_file()
+        self.text_widget.config(state='normal')  # Make the text widget changeable
+        self.text_widget.delete('1.0', tk.END)
+        self.text_widget.insert('1.0', ''.join(self.char_list))
+        self.statistics.reset()
         self.statistics = Statistics()
         self.typing_trainer = TypingTrainer(self.char_list, self.statistics)
         self.entry.delete(0, 'end')
         # Update the original text
-        self.text_widget.config(state='normal')  # Make the text widget changeable
-        self.text_widget.delete('1.0', 'end')
-        self.text_widget.insert('1.0', ''.join(self.char_list))
         self.text_widget.config(state='disabled')  # Make the text widget unchangeable again
         # Clear the entered text window
         self.entered_text_widget.delete('1.0', 'end')
