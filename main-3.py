@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
 import os
 import random
@@ -52,6 +53,32 @@ class Statistics:
         return self.total_chars / elapsed_time if elapsed_time > 0 else 0
 
 
+class Application(tk.Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.start_button = None
+        self.start_label = None
+        self.master = master
+        self.pack()
+        self.create_widgets()
+
+    def start_typing(self):
+        root.destroy()
+        #        self.start_button.destroy()
+        #        self.start_label.destroy()
+        app = App()
+        app.start()
+        app.run()
+
+    def create_widgets(self):
+        self.start_label = tk.Label(self, text="Are you ready to start?")
+        self.start_label.pack()
+
+        self.start_button = ttk.Button(self, text="Start")
+        self.start_button["command"] = self.start_typing
+        self.start_button.pack()
+
+
 class TypingTrainer:
     def __init__(self, char_list, statistics):
         self.char_list = char_list
@@ -75,7 +102,6 @@ class App:
 
         self.root = tk.Tk()
 
-        # Display the original text
         self.text_widget = tk.Text(self.root, height=30, width=100)
         self.text_widget.insert('1.0', ''.join(self.char_list))
         self.text_widget.pack()
@@ -90,11 +116,9 @@ class App:
         self.exit_button = tk.Button(self.root, text="Exit", command=self.root.quit)
         self.exit_button.pack(side='right')
 
-        # Add a "statistics" button
         self.stats_button = tk.Button(self.root, text="Statistics", command=self.show_statistics)
         self.stats_button.pack(side='right')
 
-        # Add "Stop" and "Continue" buttons
         self.stop_button = tk.Button(self.root, text="Stop", command=self.stop)
         self.stop_button.pack(side='right')
         self.continue_button = tk.Button(self.root, text="Continue", command=self.continue_)
@@ -105,16 +129,13 @@ class App:
         self.entered_text_window = tk.Toplevel(self.root)
         self.entered_text_widget = tk.Text(self.entered_text_window, height=10, width=50)
         self.entered_text_widget.pack()
-        self.text_widget.config(state='disabled')  # Make the text widget unchangeable
+        self.text_widget.config(state='disabled')
 
-        # Add a "complete" button
         self.complete_button = tk.Button(self.root, text="Complete", command=self.complete)
         self.complete_button.pack(side='right')
 
-        # Add a "Start" button
-        self.start_button = tk.Button(self.root, text="Start", command=self.start)
-        self.start_button.pack(side='left')
-# Add a timer
+        self.start_button = tk.Button(self.root, command=self.start)
+
         self.timer_label = tk.Label(self.root)
         self.timer_label.pack(side='right')
 
@@ -128,15 +149,6 @@ class App:
         self.timer_label.config(text=f'{minutes}:{seconds:02}')
         if not self.statistics.is_stopped:
             self.root.after(1000, self.update_timer)  # Update the timer every second
-
-    def update_text(self, event):
-        """Update text on the screen when a key is pressed."""
-        # other code...
-
-        # check if all text has been entered correctly
-        if self.text == self.user_text.get():
-            self.complete()
-            self.quit()
 
     def key_pressed(self, event):
         if self.statistics.is_stopped:  # Don't register key presses when stopped
@@ -156,9 +168,6 @@ class App:
     def continue_(self):
         self.statistics.continue_()
 
-
-
-
     def reload(self):
         self.char_list = self.job_loader.load_random_file()
         self.statistics = Statistics()
@@ -171,7 +180,6 @@ class App:
         self.text_widget.config(state='disabled')  # Make the text widget unchangeable again
         # Clear the entered text window
         self.entered_text_widget.delete('1.0', 'end')
-
 
     def show_statistics(self):
         messagebox.showinfo("Statistics",
@@ -203,5 +211,6 @@ class App:
 
 
 if __name__ == "__main__":
-    app = App()
-    app.run()
+    root = tk.Tk()
+    app = Application(master=root)
+    app.mainloop()
